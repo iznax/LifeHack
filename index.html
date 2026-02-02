@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LifeHack Journal</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: #1a1d21;
+            color: #d1d2d3;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Left Sidebar */
+        .sidebar {
+            width: 260px;
+            background: #1a1d21;
+            border-right: 1px solid #2e3338;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #2e3338;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 900;
+            color: #ffffff;
+        }
+
+        .hamburger-btn {
+            background: transparent;
+            border: none;
+            color: #d1d2d3;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .hamburger-btn:hover {
+            background: #2e3338;
+        }
+
+        .hamburger-menu {
+            position: absolute;
+            top: 60px;
+            left: 20px;
+            background: #1a1d21;
+            border: 1px solid #2e3338;
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 200px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            z-index: 100;
+            display: none;
+        }
+
+        .hamburger-menu.show {
+            display: block;
+        }
+
+        .menu-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            color: #d1d2d3;
+            font-size: 14px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .menu-item:hover {
+            background: #2e3338;
+        }
+
+        .menu-separator {
+            height: 1px;
+            background: #2e3338;
+            margin: 4px 0;
+        }
+
+        .categories {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px 0;
+        }
+
+        .category-item {
+            padding: 6px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.1s;
+            color: #d1d2d3;
+            font-size: 15px;
+            position: relative;
+        }
+
+        .category-item:hover {
+            background: #2e3338;
+        }
+
+        .category-item.active {
+            background: #1164a3;
+            color: #ffffff;
+        }
+
+        .category-item .emoji {
+            font-size: 16px;
+        }
+
+        .category-name {
+            flex: 1;
+        }
+
+        .category-actions {
+            display: none;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .category-item.active .category-actions {
+            display: flex;
+        }
+
+        .category-btn {
+            background: transparent;
+            border: none;
+            color: #7a7d81;
+            cursor: pointer;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .category-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #d1d2d3;
+        }
+
+        .rename-input {
+            flex: 1;
+            background: #2e3338;
+            border: 1px solid #1164a3;
+            color: #ffffff;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+
+        .rename-input:focus {
+            outline: none;
+        }
+
+        .add-category {
+            padding: 12px 16px;
+            border-top: 1px solid #2e3338;
+        }
+
+        .add-category input {
+            width: 100%;
+            background: #2e3338;
+            border: 1px solid #2e3338;
+            color: #d1d2d3;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .add-category input::placeholder {
+            color: #7a7d81;
+        }
+
+        .add-category input:focus {
+            outline: none;
+            border-color: #1164a3;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #222529;
+        }
+
+        .content-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #2e3338;
+            background: #1a1d21;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .content-header h2 {
+            font-size: 22px;
+            font-weight: 900;
+            color: #ffffff;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .header-btn {
+            background: transparent;
+            border: 1px solid #2e3338;
+            color: #d1d2d3;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-btn:hover {
+            background: #2e3338;
+            border-color: #4a4d52;
+        }
+
+        .header-btn.danger:hover {
+            background: #c23934;
+            border-color: #c23934;
+            color: white;
+        }
+
+        .export-menu {
+            position: absolute;
+            top: 65px;
+            right: 24px;
+            background: #1a1d21;
+            border: 1px solid #2e3338;
+            border-radius: 8px;
+            padding: 8px 0;
+            min-width: 180px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+            z-index: 100;
+            display: none;
+        }
+
+        .export-menu.show {
+            display: block;
+        }
+
+        .entries-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+
+        .entry {
+            background: #1a1d21;
+            border: 1px solid #2e3338;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+
+        .entry:hover {
+            border-color: #4a4d52;
+        }
+
+        .entry-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .entry-time {
+            font-size: 12px;
+            color: #7a7d81;
+        }
+
+        .entry-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .entry-actions button {
+            background: transparent;
+            border: none;
+            color: #7a7d81;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .entry-actions button:hover {
+            background: #2e3338;
+            color: #d1d2d3;
+        }
+
+        .edited-label {
+            font-size: 11px;
+            color: #7a7d81;
+            font-style: italic;
+            margin-left: 6px;
+        }
+
+        .edit-mode {
+            background: #2e3338;
+            border: 1px solid #1164a3;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+
+        .edit-textarea {
+            width: 100%;
+            background: #1a1d21;
+            border: 1px solid #2e3338;
+            color: #d1d2d3;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 60px;
+            margin-bottom: 8px;
+        }
+
+        .edit-textarea:focus {
+            outline: none;
+            border-color: #1164a3;
+        }
+
+        .edit-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .edit-buttons button {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .save-edit {
+            background: #007a5a;
+            color: white;
+        }
+
+        .save-edit:hover {
+            background: #148567;
+        }
+
+        .cancel-edit {
+            background: #2e3338;
+            color: #d1d2d3;
+        }
+
+        .cancel-edit:hover {
+            background: #4a4d52;
+        }
+
+        .edit-emoji-section {
+            background: #1a1d21;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+
+        .edit-emoji-section h4 {
+            font-size: 13px;
+            color: #d1d2d3;
+            margin-bottom: 8px;
+        }
+
+        .edit-emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .edit-emoji-option {
+            background: transparent;
+            border: 1px solid transparent;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .edit-emoji-option:hover {
+            background: #2e3338;
+        }
+
+        .edit-emoji-option.selected {
+            background: #1164a3;
+            border-color: #1164a3;
+        }
+
+        .current-tags-edit {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-bottom: 8px;
+        }
+
+        .entry-text {
+            color: #d1d2d3;
+            line-height: 1.5;
+            margin-bottom: 8px;
+            word-wrap: break-word;
+        }
+
+        .entry-image {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 4px;
+            margin-top: 8px;
+            cursor: pointer;
+        }
+
+        .entry-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+
+        .tag {
+            font-size: 18px;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 20px 24px;
+            border-top: 1px solid #2e3338;
+            background: #1a1d21;
+        }
+
+        .input-container {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .input-box {
+            flex: 1;
+            background: #2e3338;
+            border: 1px solid #2e3338;
+            color: #d1d2d3;
+            padding: 12px 16px;
+            border-radius: 4px;
+            font-size: 15px;
+            resize: none;
+            font-family: inherit;
+        }
+
+        .input-box:focus {
+            outline: none;
+            border-color: #1164a3;
+        }
+
+        .input-box::placeholder {
+            color: #7a7d81;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            background: #007a5a;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .btn:hover {
+            background: #148567;
+        }
+
+        .btn-secondary {
+            background: #2e3338;
+        }
+
+        .btn-secondary:hover {
+            background: #4a4d52;
+        }
+
+        .emoji-picker {
+            position: relative;
+        }
+
+        .emoji-button {
+            background: #2e3338;
+            border: none;
+            color: #d1d2d3;
+            padding: 10px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 18px;
+            transition: background 0.2s;
+        }
+
+        .emoji-button:hover {
+            background: #4a4d52;
+        }
+
+        .emoji-popup {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            background: #1a1d21;
+            border: 1px solid #2e3338;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            display: none;
+            max-width: 280px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .emoji-popup.show {
+            display: block;
+        }
+
+        .emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+        }
+
+        .emoji-option {
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .emoji-option:hover {
+            background: #2e3338;
+        }
+
+        .selected-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            padding: 8px 0;
+        }
+
+        .selected-tag {
+            background: #2e3338;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .remove-tag {
+            background: transparent;
+            border: none;
+            color: #7a7d81;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .remove-tag:hover {
+            color: #d1d2d3;
+        }
+
+        .image-preview-container {
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .image-preview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 4px;
+            border: 1px solid #2e3338;
+        }
+
+        .remove-image {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .remove-image:hover {
+            background: rgba(0, 0, 0, 0.9);
+        }
+
+        .file-input-label {
+            background: #2e3338;
+            color: #d1d2d3;
+            padding: 10px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 15px;
+            transition: background 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .file-input-label:hover {
+            background: #4a4d52;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* Image Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            color: white;
+            font-size: 40px;
+            cursor: pointer;
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #1a1d21;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #4a4d52;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #5a5d62;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h1>LifeHack Journal</h1>
+                <button class="hamburger-btn" onclick="toggleHamburgerMenu()">☰</button>
+            </div>
+            <div class="hamburger-menu" id="hamburgerMenu">
+                <div class="menu-item" onclick="exportAllData()">
+                    <span>📦</span>
+                    <span>Export All Data (ZIP)</span>
+                </div>
+                <div class="menu-item" onclick="exportAllDataJSON()">
+                    <span>💾</span>
+                    <span>Export Database (JSON)</span>
+                </div>
+                <div class="menu-separator"></div>
+                <div class="menu-item" onclick="importData()">
+                    <span>📥</span>
+                    <span>Import Database</span>
+                </div>
+            </div>
+            <div class="categories" id="categoriesList"></div>
+            <div class="add-category">
+                <input type="text" id="newCategoryInput" placeholder='Add category (e.g., "@Videos") or select above'>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="content-header">
+                <h2 id="categoryTitle">Home</h2>
+                <div class="header-actions">
+                    <button class="header-btn" onclick="toggleExportMenu()" id="exportBtn" title="Export category">
+                        <span>📥︎</span>
+                    </button>
+                    <button class="header-btn danger" onclick="deleteCategory()" id="deleteCategoryBtn" style="display: none;" title="Delete category">
+                        <span>🗑︎</span>
+                    </button>
+                </div>
+                <div class="export-menu" id="exportMenu">
+                    <div class="menu-item" onclick="exportCategoryZip()">
+                        <span>📦</span>
+                        <span>Export as ZIP</span>
+                    </div>
+                    <div class="menu-item" onclick="exportCategoryText()">
+                        <span>📄</span>
+                        <span>Export as Text</span>
+                    </div>
+                    <div class="menu-item" onclick="exportCategoryJSON()">
+                        <span>💾</span>
+                        <span>Export as JSON</span>
+                    </div>
+                </div>
+            </div>
+            <div class="entries-container" id="entriesContainer"></div>
+            <div class="input-area">
+                <div class="input-container">
+                    <div class="selected-tags" id="selectedTags"></div>
+                    <div class="image-preview-container" id="imagePreviewContainer" style="display: none;">
+                        <img id="imagePreview" class="image-preview">
+                        <button class="remove-image" onclick="removeImagePreview()" title="Remove image">×</button>
+                    </div>
+                    <div class="input-row">
+                        <textarea 
+                            id="entryInput" 
+                            class="input-box" 
+                            placeholder="Write something..." 
+                            rows="3"
+                        ></textarea>
+                    </div>
+                    <div class="button-group">
+                        <button class="btn" onclick="addEntry()">Add Entry</button>
+                        <label class="file-input-label">
+                            📷 Add Image
+                            <input type="file" id="imageInput" accept="image/*" onchange="handleImageSelect(event)">
+                        </label>
+                        <div class="emoji-picker">
+                            <button class="emoji-button" onclick="toggleEmojiPicker()">😊 Tag</button>
+                            <div class="emoji-popup" id="emojiPopup">
+                                <div class="emoji-grid" id="emojiGrid"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Modal -->
+    <div class="modal" id="imageModal" onclick="closeModal()">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
+
+    <!-- Hidden file input for import -->
+    <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
+
+    <script>
+        // Default categories
+        const defaultCategories = ['Home', 'Auto', 'Health', 'Shopping', 'Adventure', 'Travel'];
+        const recycleBinCategory = 'Recycle Bin';
+        
+        // Data structure
+        let categories = [];
+        let entries = {};
+        let currentCategory = 'Home';
+        let selectedTags = [];
+        let selectedImage = null;
+
+        // Emoji list
+        const emojis = ['😊', '❤️', '🎉', '⭐', '🔥', '💡', '✅', '📌', '🎯', '💪', '🌟', '🚀', '🎨', '📚', '🎵', '🍕', '☕', '🌈', '🌸', '🎁', '💼', '🏆', '🎮', '📱', '💻', '✈️', '🏠', '🚗', '🏋️', '🧘', '🍔', '🌮'];
+
+        // Initialize
+        function init() {
+            loadData();
+            if (categories.length === 0) {
+                categories = [...defaultCategories, recycleBinCategory];
+                [...defaultCategories, recycleBinCategory].forEach(cat => {
+                    entries[cat] = [];
+                });
+                saveData();
+            } else if (!categories.includes(recycleBinCategory)) {
+                // Add Recycle Bin if it doesn't exist in older data
+                categories.push(recycleBinCategory);
+                entries[recycleBinCategory] = [];
+                saveData();
+            }
+            renderCategories();
+            updateCategoryTitle();
+            renderEntries();
+            renderEmojiGrid();
+        }
+
+        // Load data from localStorage
+        function loadData() {
+            const savedData = localStorage.getItem('lifehackData');
+            if (savedData) {
+                const data = JSON.parse(savedData);
+                categories = data.categories || [];
+                entries = data.entries || {};
+            }
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            const data = {
+                categories: categories,
+                entries: entries
+            };
+            localStorage.setItem('lifehackData', JSON.stringify(data));
+        }
+
+        // Render categories
+        function renderCategories() {
+            const container = document.getElementById('categoriesList');
+            container.innerHTML = categories.map((cat, index) => {
+                const isRecycleBin = cat === recycleBinCategory;
+                const icon = isRecycleBin ? '🗑️' : '#';
+                const style = isRecycleBin ? 'border-top: 1px solid #2e3338; margin-top: 8px; padding-top: 8px;' : '';
+                const canMoveUp = index > 0 && !isRecycleBin;
+                const canMoveDown = index < categories.length - 1 && !isRecycleBin && categories[index + 1] !== recycleBinCategory;
+                
+                return `
+                    <div class="category-item ${cat === currentCategory ? 'active' : ''}" 
+                         style="${style}"
+                         data-category="${cat}">
+                        <span class="emoji">${icon}</span>
+                        <span class="category-name" onclick="selectCategory('${escapeHtml(cat)}')">${escapeHtml(cat)}</span>
+                        ${!isRecycleBin ? `
+                            <div class="category-actions">
+                                ${canMoveUp ? `<button class="category-btn" onclick="moveCategoryUp('${escapeHtml(cat)}')" title="Move up">▲</button>` : ''}
+                                ${canMoveDown ? `<button class="category-btn" onclick="moveCategoryDown('${escapeHtml(cat)}')" title="Move down">▼</button>` : ''}
+                                <button class="category-btn" onclick="startRenameCategory('${escapeHtml(cat)}')" title="Rename">✏︎</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Select category
+        function selectCategory(category) {
+            currentCategory = category;
+            updateCategoryTitle();
+            renderCategories();
+            renderEntries();
+            
+            // Close menus
+            document.getElementById('exportMenu').classList.remove('show');
+            document.getElementById('hamburgerMenu').classList.remove('show');
+        }
+
+        // Update category title with count
+        function updateCategoryTitle() {
+            const count = entries[currentCategory] ? entries[currentCategory].length : 0;
+            document.getElementById('categoryTitle').textContent = `${currentCategory} (${count})`;
+            
+            // Show/hide delete category button
+            const deleteBtn = document.getElementById('deleteCategoryBtn');
+            const isRecycleBin = currentCategory === recycleBinCategory;
+            deleteBtn.style.display = isRecycleBin ? 'none' : 'inline-flex';
+        }
+
+        // Handle new category input
+        document.getElementById('newCategoryInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                let value = this.value.trim();
+                if (value) {
+                    // Check if starts with @
+                    if (value.startsWith('@')) {
+                        value = value.substring(1).trim();
+                    }
+                    
+                    if (value && !categories.includes(value)) {
+                        categories.push(value);
+                        entries[value] = [];
+                        saveData();
+                        selectCategory(value);
+                        renderCategories();
+                    }
+                    this.value = '';
+                }
+            }
+        });
+
+        // Render emoji grid
+        function renderEmojiGrid() {
+            const grid = document.getElementById('emojiGrid');
+            grid.innerHTML = emojis.map(emoji => `
+                <button class="emoji-option" onclick="addTag('${emoji}')">${emoji}</button>
+            `).join('');
+        }
+
+        // Toggle emoji picker
+        function toggleEmojiPicker() {
+            const popup = document.getElementById('emojiPopup');
+            popup.classList.toggle('show');
+        }
+
+        // Toggle hamburger menu
+        function toggleHamburgerMenu() {
+            const menu = document.getElementById('hamburgerMenu');
+            menu.classList.toggle('show');
+            // Close export menu if open
+            document.getElementById('exportMenu').classList.remove('show');
+        }
+
+        // Toggle export menu
+        function toggleExportMenu() {
+            const menu = document.getElementById('exportMenu');
+            menu.classList.toggle('show');
+            // Close hamburger menu if open
+            document.getElementById('hamburgerMenu').classList.remove('show');
+        }
+
+        // Close menus when clicking outside
+        document.addEventListener('click', function(e) {
+            const picker = document.querySelector('.emoji-picker');
+            const popup = document.getElementById('emojiPopup');
+            const hamburgerBtn = document.querySelector('.hamburger-btn');
+            const hamburgerMenu = document.getElementById('hamburgerMenu');
+            const exportBtn = document.getElementById('exportBtn');
+            const exportMenu = document.getElementById('exportMenu');
+            
+            // Close emoji picker
+            if (picker && !picker.contains(e.target)) {
+                popup.classList.remove('show');
+            }
+            
+            // Close hamburger menu
+            if (hamburgerBtn && !hamburgerBtn.contains(e.target) && !hamburgerMenu.contains(e.target)) {
+                hamburgerMenu.classList.remove('show');
+            }
+            
+            // Close export menu
+            if (exportBtn && !exportBtn.contains(e.target) && !exportMenu.contains(e.target)) {
+                exportMenu.classList.remove('show');
+            }
+        });
+
+        // Add tag
+        function addTag(emoji) {
+            if (!selectedTags.includes(emoji)) {
+                selectedTags.push(emoji);
+                renderSelectedTags();
+            }
+        }
+
+        // Remove tag
+        function removeTag(emoji) {
+            selectedTags = selectedTags.filter(tag => tag !== emoji);
+            renderSelectedTags();
+        }
+
+        // Render selected tags
+        function renderSelectedTags() {
+            const container = document.getElementById('selectedTags');
+            if (selectedTags.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = selectedTags.map(tag => `
+                <div class="selected-tag">
+                    <span>${tag}</span>
+                    <button class="remove-tag" onclick="removeTag('${tag}')">×</button>
+                </div>
+            `).join('');
+        }
+
+        // Handle image selection
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    selectedImage = e.target.result;
+                    // Show preview
+                    const previewContainer = document.getElementById('imagePreviewContainer');
+                    const previewImg = document.getElementById('imagePreview');
+                    previewImg.src = selectedImage;
+                    previewContainer.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Remove image preview
+        function removeImagePreview() {
+            selectedImage = null;
+            document.getElementById('imagePreviewContainer').style.display = 'none';
+            document.getElementById('imageInput').value = '';
+        }
+
+        // Add entry
+        function addEntry() {
+            const input = document.getElementById('entryInput');
+            const text = input.value.trim();
+            
+            if (!text && !selectedImage) return;
+
+            const entry = {
+                id: Date.now(),
+                text: text,
+                timestamp: new Date().toISOString(),
+                tags: [...selectedTags],
+                image: selectedImage
+            };
+
+            if (!entries[currentCategory]) {
+                entries[currentCategory] = [];
+            }
+
+            entries[currentCategory].unshift(entry);
+            saveData();
+
+            // Reset inputs
+            input.value = '';
+            selectedTags = [];
+            selectedImage = null;
+            renderSelectedTags();
+            document.getElementById('imageInput').value = '';
+            document.getElementById('imagePreviewContainer').style.display = 'none';
+            
+            updateCategoryTitle();
+            renderEntries();
+        }
+
+        // Delete entry (move to Recycle Bin or permanently delete if already in Recycle Bin)
+        function deleteEntry(id) {
+            if (!entries[currentCategory]) {
+                entries[currentCategory] = [];
+            }
+            
+            const entry = entries[currentCategory].find(e => e.id === id);
+            if (!entry) return;
+
+            if (currentCategory === recycleBinCategory) {
+                // Permanent delete from Recycle Bin
+                if (confirm('Permanently delete this entry? This cannot be undone.')) {
+                    entries[recycleBinCategory] = entries[recycleBinCategory].filter(e => e.id !== id);
+                    saveData();
+                    updateCategoryTitle();
+                    renderEntries();
+                }
+            } else {
+                // Move to Recycle Bin
+                entry.originalCategory = currentCategory;
+                entry.deletedAt = new Date().toISOString();
+                
+                if (!entries[recycleBinCategory]) {
+                    entries[recycleBinCategory] = [];
+                }
+                
+                entries[recycleBinCategory].unshift(entry);
+                entries[currentCategory] = entries[currentCategory].filter(e => e.id !== id);
+                saveData();
+                updateCategoryTitle();
+                renderEntries();
+            }
+        }
+
+        // Restore entry from Recycle Bin
+        function restoreEntry(id) {
+            if (!entries[recycleBinCategory]) {
+                entries[recycleBinCategory] = [];
+            }
+            
+            const entry = entries[recycleBinCategory].find(e => e.id === id);
+            if (!entry) return;
+
+            const originalCategory = entry.originalCategory || 'Home';
+            
+            // Remove recycle bin metadata
+            delete entry.originalCategory;
+            delete entry.deletedAt;
+            
+            // Restore to original category
+            if (!entries[originalCategory]) {
+                entries[originalCategory] = [];
+            }
+            
+            entries[originalCategory].unshift(entry);
+            entries[recycleBinCategory] = entries[recycleBinCategory].filter(e => e.id !== id);
+            saveData();
+            updateCategoryTitle();
+            renderEntries();
+        }
+
+        // Start editing entry text
+        function startEditText(id) {
+            const entry = entries[currentCategory].find(e => e.id === id);
+            if (!entry) return;
+
+            const entryElement = document.querySelector(`[data-entry-id="${id}"]`);
+            const textElement = entryElement.querySelector('.entry-text');
+            
+            const editHtml = `
+                <div class="edit-mode">
+                    <textarea class="edit-textarea" id="edit-text-${id}">${escapeHtml(entry.text || '')}</textarea>
+                    <div class="edit-buttons">
+                        <button class="save-edit" onclick="saveEditText(${id})">Save</button>
+                        <button class="cancel-edit" onclick="renderEntries()">Cancel</button>
+                    </div>
+                </div>
+            `;
+            
+            if (textElement) {
+                textElement.outerHTML = editHtml;
+            } else {
+                entryElement.querySelector('.entry-header').insertAdjacentHTML('afterend', editHtml);
+            }
+            
+            document.getElementById(`edit-text-${id}`).focus();
+        }
+
+        // Save edited text
+        function saveEditText(id) {
+            const textarea = document.getElementById(`edit-text-${id}`);
+            const newText = textarea.value.trim();
+            
+            const entry = entries[currentCategory].find(e => e.id === id);
+            if (entry) {
+                entry.text = newText;
+                entry.edited = true;
+                saveData();
+                renderEntries();
+            }
+        }
+
+        // Start editing emojis
+        function startEditEmojis(id) {
+            const entry = entries[currentCategory].find(e => e.id === id);
+            if (!entry) return;
+
+            const entryElement = document.querySelector(`[data-entry-id="${id}"]`);
+            let tagsElement = entryElement.querySelector('.entry-tags');
+            
+            if (!tagsElement) {
+                // Create tags element if it doesn't exist
+                const insertPoint = entryElement.querySelector('.entry-image') || entryElement.querySelector('.entry-text');
+                if (insertPoint) {
+                    insertPoint.insertAdjacentHTML('afterend', '<div class="entry-tags"></div>');
+                    tagsElement = entryElement.querySelector('.entry-tags');
+                } else {
+                    entryElement.querySelector('.entry-header').insertAdjacentHTML('afterend', '<div class="entry-tags"></div>');
+                    tagsElement = entryElement.querySelector('.entry-tags');
+                }
+            }
+
+            const currentTags = entry.tags || [];
+            
+            const editHtml = `
+                <div class="edit-mode">
+                    <div class="edit-emoji-section">
+                        <h4>Current Tags:</h4>
+                        <div class="current-tags-edit" id="current-tags-${id}">
+                            ${currentTags.length > 0 ? currentTags.map(tag => `<span class="tag">${tag}</span>`).join('') : '<span style="color: #7a7d81; font-size: 13px;">No tags</span>'}
+                        </div>
+                        <h4>Select Tags:</h4>
+                        <div class="edit-emoji-grid">
+                            ${emojis.map(emoji => `
+                                <button class="edit-emoji-option ${currentTags.includes(emoji) ? 'selected' : ''}" 
+                                        onclick="toggleEmojiEdit(${id}, '${emoji}', this)">
+                                    ${emoji}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="edit-buttons">
+                        <button class="save-edit" onclick="saveEditEmojis(${id})">Save</button>
+                        <button class="cancel-edit" onclick="renderEntries()">Cancel</button>
+                    </div>
+                </div>
+            `;
+            
+            tagsElement.outerHTML = editHtml;
+        }
+
+        // Toggle emoji selection during edit
+        function toggleEmojiEdit(id, emoji, button) {
+            button.classList.toggle('selected');
+        }
+
+        // Save edited emojis
+        function saveEditEmojis(id) {
+            const selectedButtons = document.querySelectorAll(`[data-entry-id="${id}"] .edit-emoji-option.selected`);
+            const newTags = Array.from(selectedButtons).map(btn => btn.textContent.trim());
+            
+            const entry = entries[currentCategory].find(e => e.id === id);
+            if (entry) {
+                entry.tags = newTags;
+                saveData();
+                renderEntries();
+            }
+        }
+
+        // Format date
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'Just now';
+            if (diffMins < 60) return `${diffMins} min ago`;
+            if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+            
+            return date.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric', 
+                year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+                hour: 'numeric',
+                minute: '2-digit'
+            });
+        }
+
+        // Render entries
+        function renderEntries() {
+            const container = document.getElementById('entriesContainer');
+            const categoryEntries = entries[currentCategory] || [];
+            const isRecycleBin = currentCategory === recycleBinCategory;
+            
+            if (categoryEntries.length === 0) {
+                const emptyMessage = isRecycleBin 
+                    ? 'Recycle Bin is empty' 
+                    : 'No entries yet. Start journaling!';
+                container.innerHTML = `<div style="text-align: center; color: #7a7d81; padding: 40px;">${emptyMessage}</div>`;
+                return;
+            }
+
+            container.innerHTML = categoryEntries.map(entry => `
+                <div class="entry" data-entry-id="${entry.id}">
+                    <div class="entry-header">
+                        <div class="entry-time">
+                            ${isRecycleBin && entry.originalCategory ? `<span style="color: #1164a3; font-weight: 600;">${entry.originalCategory}</span> • ` : ''}
+                            ${formatDate(entry.timestamp)}${entry.edited ? '<span class="edited-label">(edited)</span>' : ''}
+                            ${isRecycleBin ? `<span class="edited-label"> • deleted ${formatDate(entry.deletedAt)}</span>` : ''}
+                        </div>
+                        <div class="entry-actions">
+                            ${isRecycleBin ? `
+                                <button onclick="restoreEntry(${entry.id})" title="Restore">↩️</button>
+                                <button onclick="deleteEntry(${entry.id})" title="Delete permanently">🗑️</button>
+                            ` : `
+                                <button onclick="startEditText(${entry.id})" title="Edit text">✏️</button>
+                                <button onclick="startEditEmojis(${entry.id})" title="Edit tags">😊</button>
+                                <button onclick="deleteEntry(${entry.id})" title="Move to Recycle Bin">🗑️</button>
+                            `}
+                        </div>
+                    </div>
+                    ${entry.text ? `<div class="entry-text">${escapeHtml(entry.text)}</div>` : ''}
+                    ${entry.image ? `<img src="${entry.image}" class="entry-image" onclick="openModal('${entry.image}')">` : ''}
+                    ${entry.tags && entry.tags.length > 0 ? `
+                        <div class="entry-tags">
+                            ${entry.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+
+            // Scroll to top
+            container.scrollTop = 0;
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Open image modal
+        function openModal(imageSrc) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.classList.add('show');
+            modalImg.src = imageSrc;
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('imageModal').classList.remove('show');
+        }
+
+        // Delete category
+        function deleteCategory() {
+            if (currentCategory === recycleBinCategory) {
+                alert('Cannot delete Recycle Bin');
+                return;
+            }
+            
+            const entryCount = entries[currentCategory] ? entries[currentCategory].length : 0;
+            const message = entryCount > 0 
+                ? `Delete "${currentCategory}" and move ${entryCount} ${entryCount === 1 ? 'entry' : 'entries'} to Recycle Bin?`
+                : `Delete "${currentCategory}"?`;
+            
+            if (confirm(message)) {
+                // Move entries to Recycle Bin if any exist
+                if (entryCount > 0) {
+                    if (!entries[recycleBinCategory]) {
+                        entries[recycleBinCategory] = [];
+                    }
+                    
+                    entries[currentCategory].forEach(entry => {
+                        entry.originalCategory = currentCategory;
+                        entry.deletedAt = new Date().toISOString();
+                        entries[recycleBinCategory].unshift(entry);
+                    });
+                }
+                
+                // Remove category
+                delete entries[currentCategory];
+                categories = categories.filter(cat => cat !== currentCategory);
+                saveData();
+                
+                // Switch to Home
+                selectCategory('Home');
+                renderCategories();
+            }
+        }
+
+        // Move category up
+        function moveCategoryUp(category) {
+            const index = categories.indexOf(category);
+            if (index > 0) {
+                [categories[index], categories[index - 1]] = [categories[index - 1], categories[index]];
+                saveData();
+                renderCategories();
+            }
+        }
+
+        // Move category down
+        function moveCategoryDown(category) {
+            const index = categories.indexOf(category);
+            if (index < categories.length - 1 && categories[index + 1] !== recycleBinCategory) {
+                [categories[index], categories[index + 1]] = [categories[index + 1], categories[index]];
+                saveData();
+                renderCategories();
+            }
+        }
+
+        // Start renaming category
+        function startRenameCategory(category) {
+            if (category === recycleBinCategory) return;
+            
+            const categoryItem = document.querySelector(`[data-category="${category}"]`);
+            const nameSpan = categoryItem.querySelector('.category-name');
+            const actionsDiv = categoryItem.querySelector('.category-actions');
+            
+            // Hide actions temporarily
+            if (actionsDiv) actionsDiv.style.display = 'none';
+            
+            // Replace name with input
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'rename-input';
+            input.value = category;
+            input.onblur = function() {
+                finishRenameCategory(category, input.value.trim());
+            };
+            input.onkeydown = function(e) {
+                if (e.key === 'Enter') {
+                    finishRenameCategory(category, input.value.trim());
+                } else if (e.key === 'Escape') {
+                    renderCategories();
+                }
+            };
+            
+            nameSpan.replaceWith(input);
+            input.focus();
+            input.select();
+        }
+
+        // Finish renaming category
+        function finishRenameCategory(oldName, newName) {
+            if (!newName || newName === oldName) {
+                renderCategories();
+                return;
+            }
+            
+            if (categories.includes(newName)) {
+                alert('A category with that name already exists');
+                renderCategories();
+                return;
+            }
+            
+            // Update category name
+            const index = categories.indexOf(oldName);
+            if (index !== -1) {
+                categories[index] = newName;
+            }
+            
+            // Move entries to new category name
+            entries[newName] = entries[oldName];
+            delete entries[oldName];
+            
+            // Update current category if it was renamed
+            if (currentCategory === oldName) {
+                currentCategory = newName;
+                updateCategoryTitle();
+            }
+            
+            // Update entries in Recycle Bin that reference old category
+            if (entries[recycleBinCategory]) {
+                entries[recycleBinCategory].forEach(entry => {
+                    if (entry.originalCategory === oldName) {
+                        entry.originalCategory = newName;
+                    }
+                });
+            }
+            
+            saveData();
+            renderCategories();
+        }
+
+        // Export category as ZIP
+        async function exportCategoryZip() {
+            const zip = new JSZip();
+            const categoryEntries = entries[currentCategory] || [];
+            const folderName = currentCategory.replace(/[^a-z0-9]/gi, '_');
+            
+            // Create text summary
+            let textContent = `${currentCategory} - LifeHack Journal Export\n`;
+            textContent += `Exported: ${new Date().toLocaleString()}\n`;
+            textContent += `Total Entries: ${categoryEntries.length}\n`;
+            textContent += `${'='.repeat(60)}\n\n`;
+            
+            categoryEntries.forEach((entry, index) => {
+                textContent += `Entry #${categoryEntries.length - index}\n`;
+                textContent += `Date: ${new Date(entry.timestamp).toLocaleString()}\n`;
+                if (entry.tags && entry.tags.length > 0) {
+                    textContent += `Tags: ${entry.tags.join(' ')}\n`;
+                }
+                if (entry.text) {
+                    textContent += `\n${entry.text}\n`;
+                }
+                if (entry.image) {
+                    textContent += `\n[Image attached: entry_${index + 1}.jpg]\n`;
+                }
+                textContent += `\n${'-'.repeat(60)}\n\n`;
+            });
+            
+            zip.file(`${folderName}.txt`, textContent);
+            
+            // Add JSON data
+            zip.file(`${folderName}.json`, JSON.stringify({
+                category: currentCategory,
+                exportDate: new Date().toISOString(),
+                entries: categoryEntries
+            }, null, 2));
+            
+            // Add images
+            const imagesFolder = zip.folder('images');
+            categoryEntries.forEach((entry, index) => {
+                if (entry.image) {
+                    const base64Data = entry.image.split(',')[1];
+                    imagesFolder.file(`entry_${index + 1}.jpg`, base64Data, {base64: true});
+                }
+            });
+            
+            // Generate and download
+            const blob = await zip.generateAsync({type: 'blob'});
+            downloadFile(blob, `${folderName}_${Date.now()}.zip`);
+            
+            document.getElementById('exportMenu').classList.remove('show');
+        }
+
+        // Export category as text
+        function exportCategoryText() {
+            const categoryEntries = entries[currentCategory] || [];
+            
+            let textContent = `${currentCategory} - LifeHack Journal Export\n`;
+            textContent += `Exported: ${new Date().toLocaleString()}\n`;
+            textContent += `Total Entries: ${categoryEntries.length}\n`;
+            textContent += `${'='.repeat(60)}\n\n`;
+            
+            categoryEntries.forEach((entry, index) => {
+                textContent += `Entry #${categoryEntries.length - index}\n`;
+                textContent += `Date: ${new Date(entry.timestamp).toLocaleString()}\n`;
+                if (entry.tags && entry.tags.length > 0) {
+                    textContent += `Tags: ${entry.tags.join(' ')}\n`;
+                }
+                if (entry.text) {
+                    textContent += `\n${entry.text}\n`;
+                }
+                if (entry.image) {
+                    textContent += `\n[Image attached]\n`;
+                }
+                textContent += `\n${'-'.repeat(60)}\n\n`;
+            });
+            
+            const blob = new Blob([textContent], {type: 'text/plain'});
+            const filename = `${currentCategory.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.txt`;
+            downloadFile(blob, filename);
+            
+            document.getElementById('exportMenu').classList.remove('show');
+        }
+
+        // Export category as JSON
+        function exportCategoryJSON() {
+            const categoryEntries = entries[currentCategory] || [];
+            const data = {
+                category: currentCategory,
+                exportDate: new Date().toISOString(),
+                entries: categoryEntries
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const filename = `${currentCategory.replace(/[^a-z0-9]/gi, '_')}_${Date.now()}.json`;
+            downloadFile(blob, filename);
+            
+            document.getElementById('exportMenu').classList.remove('show');
+        }
+
+        // Export all data as ZIP
+        async function exportAllData() {
+            const zip = new JSZip();
+            
+            // Add database JSON
+            zip.file('lifehack_database.json', JSON.stringify({
+                categories: categories,
+                entries: entries,
+                exportDate: new Date().toISOString()
+            }, null, 2));
+            
+            // Create a folder for each category
+            for (const category of categories) {
+                const categoryEntries = entries[category] || [];
+                if (categoryEntries.length === 0) continue;
+                
+                const folderName = category.replace(/[^a-z0-9]/gi, '_');
+                const categoryFolder = zip.folder(folderName);
+                
+                // Create text summary for category
+                let textContent = `${category} - LifeHack Journal\n`;
+                textContent += `Total Entries: ${categoryEntries.length}\n`;
+                textContent += `${'='.repeat(60)}\n\n`;
+                
+                categoryEntries.forEach((entry, index) => {
+                    textContent += `Entry #${categoryEntries.length - index}\n`;
+                    textContent += `Date: ${new Date(entry.timestamp).toLocaleString()}\n`;
+                    if (entry.tags && entry.tags.length > 0) {
+                        textContent += `Tags: ${entry.tags.join(' ')}\n`;
+                    }
+                    if (entry.text) {
+                        textContent += `\n${entry.text}\n`;
+                    }
+                    if (entry.image) {
+                        textContent += `\n[Image: entry_${index + 1}.jpg]\n`;
+                    }
+                    textContent += `\n${'-'.repeat(60)}\n\n`;
+                });
+                
+                categoryFolder.file(`${folderName}.txt`, textContent);
+                
+                // Add images
+                const imagesFolder = categoryFolder.folder('images');
+                categoryEntries.forEach((entry, index) => {
+                    if (entry.image) {
+                        const base64Data = entry.image.split(',')[1];
+                        imagesFolder.file(`entry_${index + 1}.jpg`, base64Data, {base64: true});
+                    }
+                });
+            }
+            
+            // Generate and download
+            const blob = await zip.generateAsync({type: 'blob'});
+            downloadFile(blob, `lifehack_export_${Date.now()}.zip`);
+            
+            document.getElementById('hamburgerMenu').classList.remove('show');
+        }
+
+        // Export all data as JSON
+        function exportAllDataJSON() {
+            const data = {
+                categories: categories,
+                entries: entries,
+                exportDate: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            downloadFile(blob, `lifehack_database_${Date.now()}.json`);
+            
+            document.getElementById('hamburgerMenu').classList.remove('show');
+        }
+
+        // Import data
+        function importData() {
+            document.getElementById('importFileInput').click();
+            document.getElementById('hamburgerMenu').classList.remove('show');
+        }
+
+        // Handle import file
+        function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    if (data.categories && data.entries) {
+                        if (confirm('Import this database? This will replace all current data.')) {
+                            categories = data.categories;
+                            entries = data.entries;
+                            
+                            // Ensure Recycle Bin exists
+                            if (!categories.includes(recycleBinCategory)) {
+                                categories.push(recycleBinCategory);
+                                entries[recycleBinCategory] = entries[recycleBinCategory] || [];
+                            }
+                            
+                            saveData();
+                            selectCategory('Home');
+                            renderCategories();
+                            alert('Data imported successfully!');
+                        }
+                    } else {
+                        alert('Invalid database file format');
+                    }
+                } catch (err) {
+                    alert('Error reading file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset input
+            event.target.value = '';
+        }
+
+        // Download file helper
+        function downloadFile(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Handle Enter key in textarea
+        document.getElementById('entryInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                addEntry();
+            }
+        });
+
+        // Initialize app
+        init();
+    </script>
+</body>
+</html>
