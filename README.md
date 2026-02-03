@@ -1,5 +1,8 @@
 LifeHack Journal - Project Overview
 
+## Live Demo
+https://iznax.github.io/LifeHack/
+
 Purpose:
 A browser-based journaling and organization app. Users create categories, add text entries, attach images, tag entries with emojis, and export or import their data. All data is stored locally in the browser using localStorage.
 
