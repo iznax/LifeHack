@@ -741,6 +741,10 @@
                     <span>💾</span>
                     <span>Export Database (JSON)</span>
                 </div>
+                <div class="menu-item" onclick="exportAllDataYAML()">
+                    <span>📝</span>
+                    <span>Export Database (YAML)</span>
+                </div>
                 <div class="menu-separator"></div>
                 <div class="menu-item" onclick="importData()">
                     <span>📥</span>
@@ -821,7 +825,7 @@
     </div>
 
     <!-- Hidden file input for import -->
-    <input type="file" id="importFileInput" accept=".json" style="display: none;" onchange="handleImportFile(event)">
+    <input type="file" id="importFileInput" accept=".json,.yaml,.yml" style="display: none;" onchange="handleImportFile(event)">
 
     <script>
         // Default categories
@@ -940,7 +944,13 @@
                     }
                     
                     if (value && !categories.includes(value)) {
-                        categories.push(value);
+                        // Insert before Recycle Bin
+                        const recycleBinIndex = categories.indexOf(recycleBinCategory);
+                        if (recycleBinIndex !== -1) {
+                            categories.splice(recycleBinIndex, 0, value);
+                        } else {
+                            categories.push(value);
+                        }
                         entries[value] = [];
                         saveData();
                         selectCategory(value);
@@ -1654,6 +1664,80 @@
             document.getElementById('hamburgerMenu').classList.remove('show');
         }
 
+        // Convert a value to a YAML-safe scalar string
+        function yamlScalar(value, indent) {
+            if (value === null || value === undefined) return 'null';
+            if (typeof value === 'boolean') return value ? 'true' : 'false';
+            if (typeof value === 'number') return String(value);
+            const str = String(value);
+            // If it contains newlines, use block scalar
+            if (str.includes('\n')) {
+                const lines = str.split('\n').map(line => indent + '  ' + line).join('\n');
+                return '|\n' + lines;
+            }
+            // If it contains special chars or looks like a number/bool, quote it
+            if (/^['"#&*!|>%@`]/.test(str) || /[:{}\[\],&*?|>'\"%@`]/.test(str) || str === '' || /^(true|false|null|yes|no|on|off)$/i.test(str) || !isNaN(str)) {
+                return '"' + str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n') + '"';
+            }
+            return str;
+        }
+
+        // Serialize entries array to YAML
+        function entriesToYAML(entriesArr, indent) {
+            if (!entriesArr || entriesArr.length === 0) return indent + '[]';
+            let yaml = '';
+            entriesArr.forEach(entry => {
+                yaml += indent + '- id: ' + entry.id + '\n';
+                yaml += indent + '  timestamp: "' + (entry.timestamp || '') + '"\n';
+                if (entry.text !== undefined && entry.text !== null) {
+                    yaml += indent + '  text: ' + yamlScalar(entry.text, indent + ' ') + '\n';
+                }
+                if (entry.edited) {
+                    yaml += indent + '  edited: true\n';
+                }
+                if (entry.tags && entry.tags.length > 0) {
+                    yaml += indent + '  tags:\n';
+                    entry.tags.forEach(tag => {
+                        yaml += indent + '    - "' + tag + '"\n';
+                    });
+                } else {
+                    yaml += indent + '  tags: []\n';
+                }
+                if (entry.originalCategory) {
+                    yaml += indent + '  originalCategory: ' + yamlScalar(entry.originalCategory, indent + ' ') + '\n';
+                }
+                if (entry.deletedAt) {
+                    yaml += indent + '  deletedAt: "' + entry.deletedAt + '"\n';
+                }
+                if (entry.image) {
+                    yaml += indent + '  image: "[base64 image data]"\n';
+                }
+            });
+            return yaml;
+        }
+
+        // Export all data as YAML
+        function exportAllDataYAML() {
+            let yaml = '# LifeHack Journal — Full Database Export\n';
+            yaml += 'exportDate: "' + new Date().toISOString() + '"\n\n';
+
+            yaml += 'categories:\n';
+            categories.forEach(cat => {
+                yaml += '  - ' + yamlScalar(cat, '  ') + '\n';
+            });
+
+            yaml += '\nentries:\n';
+            categories.forEach(cat => {
+                yaml += '  ' + yamlScalar(cat, ' ') + ':\n';
+                yaml += entriesToYAML(entries[cat], '    ');
+            });
+
+            const blob = new Blob([yaml], {type: 'text/yaml'});
+            downloadFile(blob, `lifehack_database_${Date.now()}.yaml`);
+
+            document.getElementById('hamburgerMenu').classList.remove('show');
+        }
+
         // Import data
         function importData() {
             document.getElementById('importFileInput').click();
@@ -1668,9 +1752,16 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    const data = JSON.parse(e.target.result);
+                    const text = e.target.result;
+                    let data;
                     
-                    if (data.categories && data.entries) {
+                    if (file.name.endsWith('.yaml') || file.name.endsWith('.yml')) {
+                        data = parseYAML(text);
+                    } else {
+                        data = JSON.parse(text);
+                    }
+                    
+                    if (data && data.categories && data.entries) {
                         if (confirm('Import this database? This will replace all current data.')) {
                             categories = data.categories;
                             entries = data.entries;
@@ -1682,7 +1773,7 @@
                             }
                             
                             saveData();
-                            selectCategory('Home');
+                            selectCategory(categories[0] || 'Home');
                             renderCategories();
                             alert('Data imported successfully!');
                         }
@@ -1697,6 +1788,168 @@
             
             // Reset input
             event.target.value = '';
+        }
+
+        // --- YAML Parser ---
+        function parseYAML(text) {
+            const lines = text.split('\n');
+            const root = {};
+            // Stack tracks { indent, key, target, isArrayItem }
+            const stack = [{ indent: -1, target: root }];
+
+            function currentTarget() {
+                return stack[stack.length - 1].target;
+            }
+
+            function getIndent(line) {
+                return line.match(/^(\s*)/)[1].length;
+            }
+
+            // Unquote a YAML string value
+            function unquote(val) {
+                val = val.trim();
+                if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+                    val = val.slice(1, -1);
+                    // Unescape
+                    val = val.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+                }
+                if (val === 'null' || val === '~') return null;
+                if (val === 'true') return true;
+                if (val === 'false') return false;
+                if (val === '[]') return [];
+                // If it's purely numeric, keep as number only if it was not quoted
+                if (!isNaN(val) && val !== '') return Number(val);
+                return val;
+            }
+
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i];
+
+                // Skip comments and blank lines
+                if (line.trim() === '' || line.trim().startsWith('#')) { i++; continue; }
+
+                const indent = getIndent(line);
+                const trimmed = line.trim();
+
+                // Pop stack until we find the correct parent
+                while (stack.length > 1 && stack[stack.length - 1].indent >= indent) {
+                    stack.pop();
+                }
+
+                const parent = currentTarget();
+
+                // --- Array item: starts with "- " ---
+                if (trimmed.startsWith('- ')) {
+                    const rest = trimmed.slice(2);
+
+                    // Simple value in array: "- somevalue"
+                    if (!rest.includes(':')) {
+                        // parent should be an array
+                        if (Array.isArray(parent)) {
+                            parent.push(unquote(rest));
+                        }
+                        i++;
+                        continue;
+                    }
+
+                    // Object item in array: "- key: value"
+                    const colonIdx = rest.indexOf(':');
+                    const key = rest.slice(0, colonIdx).trim();
+                    const valPart = rest.slice(colonIdx + 1).trim();
+
+                    // Create new object, push to parent array
+                    const obj = {};
+                    if (Array.isArray(parent)) {
+                        parent.push(obj);
+                    }
+
+                    if (valPart === '' || valPart === '|') {
+                        // Nested or block scalar — will be filled by upcoming lines
+                        // For block scalar, collect indented lines
+                        if (valPart === '|') {
+                            let block = '';
+                            const blockIndent = indent + 2 + key.length + 2; // estimate; we peek
+                            i++;
+                            while (i < lines.length) {
+                                const nextLine = lines[i];
+                                if (nextLine.trim() === '') { block += '\n'; i++; continue; }
+                                const nextIndent = getIndent(nextLine);
+                                if (nextIndent <= indent + 2) break;
+                                block += nextLine.trimStart() + '\n';
+                                i++;
+                            }
+                            obj[key] = block.replace(/\n$/, '');
+                            // Push a stack entry so sibling keys at indent+2 land in obj
+                            stack.push({ indent: indent + 1, target: obj });
+                            continue;
+                        }
+                        stack.push({ indent: indent + 1, target: obj });
+                    } else {
+                        obj[key] = unquote(valPart);
+                        stack.push({ indent: indent + 1, target: obj });
+                    }
+                    i++;
+                    continue;
+                }
+
+                // --- Key: value line ---
+                if (trimmed.includes(':')) {
+                    const colonIdx = trimmed.indexOf(':');
+                    const key = trimmed.slice(0, colonIdx).trim();
+                    const valPart = trimmed.slice(colonIdx + 1).trim();
+
+                    if (valPart === '' || valPart === '|') {
+                        if (valPart === '|') {
+                            // Block scalar
+                            let block = '';
+                            i++;
+                            const scalarBaseIndent = indent;
+                            while (i < lines.length) {
+                                const nextLine = lines[i];
+                                if (nextLine.trim() === '') { block += '\n'; i++; continue; }
+                                const nextIndent = getIndent(nextLine);
+                                if (nextIndent <= scalarBaseIndent) break;
+                                block += nextLine.slice(scalarBaseIndent + 2) + '\n';
+                                i++;
+                            }
+                            if (typeof parent === 'object' && !Array.isArray(parent)) {
+                                parent[key] = block.replace(/\n$/, '');
+                            }
+                            continue;
+                        }
+
+                        // Peek next line to determine if array or nested object
+                        const nextLine = (i + 1 < lines.length) ? lines[i + 1] : '';
+                        const nextTrimmed = nextLine.trim();
+                        if (nextTrimmed.startsWith('- ')) {
+                            // It's an array
+                            const arr = [];
+                            if (typeof parent === 'object' && !Array.isArray(parent)) {
+                                parent[key] = arr;
+                            }
+                            stack.push({ indent: indent, target: arr });
+                        } else {
+                            // Nested object
+                            const obj = {};
+                            if (typeof parent === 'object' && !Array.isArray(parent)) {
+                                parent[key] = obj;
+                            }
+                            stack.push({ indent: indent, target: obj });
+                        }
+                    } else {
+                        if (typeof parent === 'object' && !Array.isArray(parent)) {
+                            parent[key] = unquote(valPart);
+                        }
+                    }
+                    i++;
+                    continue;
+                }
+
+                i++;
+            }
+
+            return root;
         }
 
         // Download file helper
