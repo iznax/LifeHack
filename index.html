@@ -218,17 +218,71 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 16px;
         }
 
         .content-header h2 {
             font-size: 22px;
             font-weight: 900;
             color: #ffffff;
+            flex-shrink: 0;
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 600px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            background: #2e3338;
+            border: 1px solid #2e3338;
+            color: #d1d2d3;
+            padding: 10px 40px 10px 16px;
+            border-radius: 4px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #1164a3;
+        }
+
+        .search-input::placeholder {
+            color: #7a7d81;
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            color: #7a7d81;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: none;
+            transition: background 0.2s;
+        }
+
+        .search-clear:hover {
+            background: #4a4d52;
+            color: #d1d2d3;
+        }
+
+        .search-clear.show {
+            display: block;
         }
 
         .header-actions {
             display: flex;
             gap: 8px;
+            flex-shrink: 0;
         }
 
         .header-btn {
@@ -445,6 +499,17 @@
             word-wrap: break-word;
         }
 
+        .entry-text a {
+            color: #1164a3;
+            text-decoration: none;
+            border-bottom: 1px solid #1164a3;
+        }
+
+        .entry-text a:hover {
+            color: #148ba8;
+            border-bottom-color: #148ba8;
+        }
+
         .entry-image {
             max-width: 100%;
             max-height: 400px;
@@ -632,6 +697,15 @@
             border: 1px solid #2e3338;
         }
 
+        .gpx-preview {
+            width: 100%;
+            max-width: 200px;
+            height: 150px;
+            border-radius: 4px;
+            border: 1px solid #2e3338;
+            background: #1a1d21;
+        }
+
         .remove-image {
             position: absolute;
             top: 8px;
@@ -651,6 +725,15 @@
 
         .remove-image:hover {
             background: rgba(0, 0, 0, 0.9);
+        }
+
+        .entry-gpx {
+            width: 100%;
+            max-width: 100%;
+            height: 300px;
+            border-radius: 4px;
+            margin-top: 8px;
+            background: #1a1d21;
         }
 
         .file-input-label {
@@ -761,6 +844,16 @@
         <div class="main-content">
             <div class="content-header">
                 <h2 id="categoryTitle">Home</h2>
+                <div class="search-container">
+                    <input 
+                        type="text" 
+                        id="searchInput" 
+                        class="search-input" 
+                        placeholder="Search entries..."
+                        oninput="handleSearchInput()"
+                    >
+                    <button class="search-clear" id="searchClear" onclick="clearSearch()" title="Clear search">×</button>
+                </div>
                 <div class="header-actions">
                     <button class="header-btn" onclick="toggleExportMenu()" id="exportBtn" title="Export category">
                         <span>📥︎</span>
@@ -792,6 +885,10 @@
                         <img id="imagePreview" class="image-preview">
                         <button class="remove-image" onclick="removeImagePreview()" title="Remove image">×</button>
                     </div>
+                    <div class="image-preview-container" id="gpxPreviewContainer" style="display: none;">
+                        <canvas id="gpxPreview" class="gpx-preview"></canvas>
+                        <button class="remove-image" onclick="removeGpxPreview()" title="Remove map">×</button>
+                    </div>
                     <div class="input-row">
                         <textarea 
                             id="entryInput" 
@@ -805,6 +902,10 @@
                         <label class="file-input-label">
                             📷 Add Image
                             <input type="file" id="imageInput" accept="image/*" onchange="handleImageSelect(event)">
+                        </label>
+                        <label class="file-input-label">
+                            🗺️ Add Map
+                            <input type="file" id="gpxInput" accept=".gpx" onchange="handleGpxSelect(event)">
                         </label>
                         <div class="emoji-picker">
                             <button class="emoji-button" onclick="toggleEmojiPicker()">😊 Tag</button>
@@ -838,6 +939,9 @@
         let currentCategory = 'Home';
         let selectedTags = [];
         let selectedImage = null;
+        let selectedGpx = null; // Will store { trackPoints: [[lat, lon], ...], bounds: {minLat, maxLat, minLon, maxLon} }
+        let searchQuery = '';
+        let searchTimeout = null;
 
         // Emoji list
         const emojis = ['😊', '❤️', '🎉', '⭐', '🔥', '💡', '✅', '📌', '🎯', '💪', '🌟', '🚀', '🎨', '📚', '🎵', '🍕', '☕', '🌈', '🌸', '🎁', '💼', '🏆', '🎮', '📱', '💻', '✈️', '🏠', '🚗', '🏋️', '🧘', '🍔', '🌮'];
@@ -915,11 +1019,124 @@
             currentCategory = category;
             updateCategoryTitle();
             renderCategories();
+            clearSearch(); // Clear search when switching categories
             renderEntries();
             
             // Close menus
             document.getElementById('exportMenu').classList.remove('show');
             document.getElementById('hamburgerMenu').classList.remove('show');
+        }
+
+        // Handle search input with debounce
+        function handleSearchInput() {
+            const input = document.getElementById('searchInput');
+            const clearBtn = document.getElementById('searchClear');
+            
+            searchQuery = input.value.trim();
+            
+            // Show/hide clear button
+            if (searchQuery) {
+                clearBtn.classList.add('show');
+            } else {
+                clearBtn.classList.remove('show');
+            }
+            
+            // Debounce search - wait 300ms after user stops typing
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                renderEntries();
+            }, 300);
+        }
+
+        // Clear search
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('searchClear').classList.remove('show');
+            searchQuery = '';
+            renderEntries();
+        }
+
+        // Parse search query into keywords and quoted phrases
+        function parseSearchQuery(query) {
+            const keywords = [];
+            const quotedPhrases = [];
+            
+            // Extract quoted phrases first
+            const quotePattern = /"([^"]+)"/g;
+            let match;
+            while ((match = quotePattern.exec(query)) !== null) {
+                quotedPhrases.push(match[1].toLowerCase());
+            }
+            
+            // Remove quoted parts and split remaining by spaces
+            const remaining = query.replace(quotePattern, '').trim();
+            if (remaining) {
+                keywords.push(...remaining.toLowerCase().split(/\s+/).filter(k => k.length > 0));
+            }
+            
+            return { keywords, quotedPhrases };
+        }
+
+        // Score an entry based on search query
+        function scoreEntry(entry, searchTerms) {
+            const { keywords, quotedPhrases } = searchTerms;
+            let score = 0;
+            
+            // Combine all searchable text
+            const searchableText = [
+                entry.text || '',
+                ...(entry.tags || [])
+            ].join(' ').toLowerCase();
+            
+            // Check exact phrase matches (+10 points each)
+            quotedPhrases.forEach(phrase => {
+                if (searchableText.includes(phrase)) {
+                    score += 10;
+                }
+            });
+            
+            // Check if all keywords are present (+2 points per keyword)
+            const allKeywordsPresent = keywords.every(keyword => searchableText.includes(keyword));
+            if (allKeywordsPresent && keywords.length > 0) {
+                score += keywords.length * 2;
+            }
+            
+            // Check any keyword match (+1 point per match)
+            keywords.forEach(keyword => {
+                if (searchableText.includes(keyword)) {
+                    score += 1;
+                }
+            });
+            
+            return score;
+        }
+
+        // Get filtered and scored entries
+        function getFilteredEntries() {
+            const categoryEntries = entries[currentCategory] || [];
+            
+            // If no search query, return all entries
+            if (!searchQuery) {
+                return categoryEntries;
+            }
+            
+            const searchTerms = parseSearchQuery(searchQuery);
+            
+            // Score and filter entries
+            const scoredEntries = categoryEntries.map(entry => ({
+                entry,
+                score: scoreEntry(entry, searchTerms)
+            })).filter(item => item.score > 0);
+            
+            // Sort by score (descending), then by date (newest first)
+            scoredEntries.sort((a, b) => {
+                if (b.score !== a.score) {
+                    return b.score - a.score;
+                }
+                return new Date(b.entry.timestamp) - new Date(a.entry.timestamp);
+            });
+            
+            return scoredEntries.map(item => item.entry);
         }
 
         // Update category title with count
@@ -1069,19 +1286,214 @@
             document.getElementById('imageInput').value = '';
         }
 
+        // Handle GPX file selection
+        function handleGpxSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const gpxText = e.target.result;
+                    const gpxData = parseGpx(gpxText);
+                    if (gpxData) {
+                        selectedGpx = gpxData;
+                        drawGpxPreview(gpxData);
+                        document.getElementById('gpxPreviewContainer').style.display = 'block';
+                    } else {
+                        alert('Could not parse GPX file');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        // Remove GPX preview
+        function removeGpxPreview() {
+            selectedGpx = null;
+            document.getElementById('gpxPreviewContainer').style.display = 'none';
+            document.getElementById('gpxInput').value = '';
+        }
+
+        // Parse GPX file
+        function parseGpx(gpxText) {
+            try {
+                const parser = new DOMParser();
+                const xmlDoc = parser.parseFromString(gpxText, 'text/xml');
+                
+                // Check for parse errors
+                const parseError = xmlDoc.querySelector('parsererror');
+                if (parseError) return null;
+                
+                // Extract track points from <trkpt> elements
+                const trkpts = xmlDoc.querySelectorAll('trkpt');
+                if (trkpts.length === 0) return null;
+                
+                const trackPoints = [];
+                let minLat = Infinity, maxLat = -Infinity;
+                let minLon = Infinity, maxLon = -Infinity;
+                
+                trkpts.forEach(pt => {
+                    const lat = parseFloat(pt.getAttribute('lat'));
+                    const lon = parseFloat(pt.getAttribute('lon'));
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        trackPoints.push([lat, lon]);
+                        minLat = Math.min(minLat, lat);
+                        maxLat = Math.max(maxLat, lat);
+                        minLon = Math.min(minLon, lon);
+                        maxLon = Math.max(maxLon, lon);
+                    }
+                });
+                
+                if (trackPoints.length === 0) return null;
+                
+                return {
+                    trackPoints: trackPoints,
+                    bounds: { minLat, maxLat, minLon, maxLon }
+                };
+            } catch (err) {
+                console.error('GPX parse error:', err);
+                return null;
+            }
+        }
+
+        // Draw GPX preview on canvas
+        function drawGpxPreview(gpxData, canvasId = 'gpxPreview') {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width = canvas.offsetWidth * 2; // 2x for retina
+            const height = canvas.height = canvas.offsetHeight * 2;
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            const { trackPoints, bounds } = gpxData;
+            const padding = 20;
+            
+            // Calculate scale to fit track in canvas
+            const latRange = bounds.maxLat - bounds.minLat || 0.001;
+            const lonRange = bounds.maxLon - bounds.minLon || 0.001;
+            const scale = Math.min((width - padding * 2) / lonRange, (height - padding * 2) / latRange);
+            
+            // Convert lat/lon to canvas coordinates
+            function toCanvasCoords(lat, lon) {
+                const x = padding + (lon - bounds.minLon) * scale;
+                const y = height - (padding + (lat - bounds.minLat) * scale); // flip Y
+                return [x, y];
+            }
+            
+            // Draw track
+            ctx.strokeStyle = '#1164a3';
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            trackPoints.forEach((point, i) => {
+                const [x, y] = toCanvasCoords(point[0], point[1]);
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+            
+            // Draw start point (green)
+            const [startX, startY] = toCanvasCoords(trackPoints[0][0], trackPoints[0][1]);
+            ctx.fillStyle = '#00ff00';
+            ctx.beginPath();
+            ctx.arc(startX, startY, 8, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw end point (red) - offset if overlapping with start
+            const lastIdx = trackPoints.length - 1;
+            let [endX, endY] = toCanvasCoords(trackPoints[lastIdx][0], trackPoints[lastIdx][1]);
+            
+            // Check if start and end are very close (within 15 pixels)
+            const distance = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
+            if (distance < 15) {
+                endX += 15; // offset to the right
+            }
+            
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(endX, endY, 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Draw GPX on canvas element in entry
+        function drawGpxInEntry(gpxData, canvasElement) {
+            const ctx = canvasElement.getContext('2d');
+            const width = canvasElement.width = canvasElement.offsetWidth * 2;
+            const height = canvasElement.height = 600; // 300px display height * 2
+            
+            ctx.clearRect(0, 0, width, height);
+            
+            const { trackPoints, bounds } = gpxData;
+            const padding = 40;
+            
+            const latRange = bounds.maxLat - bounds.minLat || 0.001;
+            const lonRange = bounds.maxLon - bounds.minLon || 0.001;
+            const scale = Math.min((width - padding * 2) / lonRange, (height - padding * 2) / latRange);
+            
+            function toCanvasCoords(lat, lon) {
+                const x = padding + (lon - bounds.minLon) * scale;
+                const y = height - (padding + (lat - bounds.minLat) * scale);
+                return [x, y];
+            }
+            
+            // Draw track
+            ctx.strokeStyle = '#1164a3';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            
+            ctx.beginPath();
+            trackPoints.forEach((point, i) => {
+                const [x, y] = toCanvasCoords(point[0], point[1]);
+                if (i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            });
+            ctx.stroke();
+            
+            // Draw start point (green)
+            const [startX, startY] = toCanvasCoords(trackPoints[0][0], trackPoints[0][1]);
+            ctx.fillStyle = '#00ff00';
+            ctx.beginPath();
+            ctx.arc(startX, startY, 12, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Draw end point (red) - offset if overlapping with start
+            const lastIdx = trackPoints.length - 1;
+            let [endX, endY] = toCanvasCoords(trackPoints[lastIdx][0], trackPoints[lastIdx][1]);
+            
+            // Check if start and end are very close (within 20 pixels)
+            const distance = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2);
+            if (distance < 20) {
+                endX += 20; // offset to the right
+            }
+            
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(endX, endY, 12, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
         // Add entry
         function addEntry() {
             const input = document.getElementById('entryInput');
             const text = input.value.trim();
             
-            if (!text && !selectedImage) return;
+            if (!text && !selectedImage && !selectedGpx) return;
 
             const entry = {
                 id: Date.now(),
                 text: text,
                 timestamp: new Date().toISOString(),
                 tags: [...selectedTags],
-                image: selectedImage
+                image: selectedImage,
+                gpx: selectedGpx
             };
 
             if (!entries[currentCategory]) {
@@ -1095,9 +1507,12 @@
             input.value = '';
             selectedTags = [];
             selectedImage = null;
+            selectedGpx = null;
             renderSelectedTags();
             document.getElementById('imageInput').value = '';
+            document.getElementById('gpxInput').value = '';
             document.getElementById('imagePreviewContainer').style.display = 'none';
+            document.getElementById('gpxPreviewContainer').style.display = 'none';
             
             updateCategoryTitle();
             renderEntries();
@@ -1298,13 +1713,19 @@
         // Render entries
         function renderEntries() {
             const container = document.getElementById('entriesContainer');
-            const categoryEntries = entries[currentCategory] || [];
+            const categoryEntries = getFilteredEntries();
             const isRecycleBin = currentCategory === recycleBinCategory;
+            const isSearching = searchQuery.length > 0;
             
             if (categoryEntries.length === 0) {
-                const emptyMessage = isRecycleBin 
-                    ? 'Recycle Bin is empty' 
-                    : 'No entries yet. Start journaling!';
+                let emptyMessage;
+                if (isSearching) {
+                    emptyMessage = 'No entries match your search';
+                } else if (isRecycleBin) {
+                    emptyMessage = 'Recycle Bin is empty';
+                } else {
+                    emptyMessage = 'No entries yet. Start journaling!';
+                }
                 container.innerHTML = `<div style="text-align: center; color: #7a7d81; padding: 40px;">${emptyMessage}</div>`;
                 return;
             }
@@ -1328,8 +1749,9 @@
                             `}
                         </div>
                     </div>
-                    ${entry.text ? `<div class="entry-text">${escapeHtml(entry.text)}</div>` : ''}
+                    ${entry.text ? `<div class="entry-text">${linkify(entry.text)}</div>` : ''}
                     ${entry.image ? `<img src="${entry.image}" class="entry-image" onclick="openModal('${entry.image}')">` : ''}
+                    ${entry.gpx ? `<canvas class="entry-gpx" data-gpx-entry="${entry.id}"></canvas>` : ''}
                     ${entry.tags && entry.tags.length > 0 ? `
                         <div class="entry-tags">
                             ${entry.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
@@ -1337,6 +1759,16 @@
                     ` : ''}
                 </div>
             `).join('');
+
+            // Draw GPX maps after DOM is ready
+            categoryEntries.forEach(entry => {
+                if (entry.gpx) {
+                    const canvas = document.querySelector(`[data-gpx-entry="${entry.id}"]`);
+                    if (canvas) {
+                        drawGpxInEntry(entry.gpx, canvas);
+                    }
+                }
+            });
 
             // Scroll to top
             container.scrollTop = 0;
@@ -1347,6 +1779,30 @@
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
+        }
+
+        // Convert URLs in text to clickable links
+        function linkify(text) {
+            // First escape HTML
+            text = escapeHtml(text);
+            
+            // Match URLs starting with http:// or https://
+            const urlPattern = /(https?:\/\/[^\s<]+)/g;
+            
+            text = text.replace(urlPattern, function(url) {
+                // Remove trailing punctuation that might not be part of URL
+                let cleanUrl = url;
+                const trailingPunc = url.match(/[.,;:!?]+$/);
+                if (trailingPunc) {
+                    cleanUrl = url.slice(0, -trailingPunc[0].length);
+                }
+                return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer">${cleanUrl}</a>${trailingPunc ? trailingPunc[0] : ''}`;
+            });
+            
+            // Preserve line breaks
+            text = text.replace(/\n/g, '<br>');
+            
+            return text;
         }
 
         // Open image modal
@@ -1684,7 +2140,7 @@
 
         // Serialize entries array to YAML
         function entriesToYAML(entriesArr, indent) {
-            if (!entriesArr || entriesArr.length === 0) return indent + '[]';
+            if (!entriesArr || entriesArr.length === 0) return indent + '[]\n';
             let yaml = '';
             entriesArr.forEach(entry => {
                 yaml += indent + '- id: ' + entry.id + '\n';
@@ -1792,7 +2248,21 @@
 
         // --- YAML Parser ---
         function parseYAML(text) {
-            const lines = text.split('\n');
+            // Pre-process: split any jammed lines caused by missing newline after []
+            // e.g. "    []  My Test:" becomes "    []\n  My Test:"
+            const rawLines = text.split('\n');
+            const lines = [];
+            rawLines.forEach(line => {
+                const match = line.match(/^(\s*)\[\]\s{2,}(.+)$/);
+                if (match) {
+                    lines.push(match[1] + '[]');
+                    // The next key is a sibling, so dedent by one level (2 spaces)
+                    const parentIndent = match[1].length >= 2 ? match[1].slice(0, -2) : '';
+                    lines.push(parentIndent + match[2]);
+                } else {
+                    lines.push(line);
+                }
+            });
             const root = {};
             // Stack tracks { indent, key, target, isArrayItem }
             const stack = [{ indent: -1, target: root }];
@@ -1922,7 +2392,13 @@
                         // Peek next line to determine if array or nested object
                         const nextLine = (i + 1 < lines.length) ? lines[i + 1] : '';
                         const nextTrimmed = nextLine.trim();
-                        if (nextTrimmed.startsWith('- ')) {
+                        if (nextTrimmed === '[]') {
+                            // Explicit empty array on next line — consume it
+                            if (typeof parent === 'object' && !Array.isArray(parent)) {
+                                parent[key] = [];
+                            }
+                            i++; // skip the [] line
+                        } else if (nextTrimmed.startsWith('- ')) {
                             // It's an array
                             const arr = [];
                             if (typeof parent === 'object' && !Array.isArray(parent)) {
